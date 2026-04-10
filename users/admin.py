@@ -1,5 +1,7 @@
 from django.contrib import admin
 from .models import *
+from django.contrib.auth.admin import UserAdmin
+from .forms import EstudianteUserCreationForm, EstudianteUserChangeForm
 
 # Register your models here.
 
@@ -23,13 +25,28 @@ class UserSimpleAdmin(admin.ModelAdmin):
 
 
 # Registro del modelo EStudiante usuario personalizado
-@admin.register(EstudianteUser)
-class EstudianteAdmin(admin.ModelAdmin):
-    list_display = (
-        'email',
-        'is_staff',
-        'is_active',
+class EstudianteAdmin(UserAdmin):
+    add_form = EstudianteUserCreationForm
+    form = EstudianteUserChangeForm
+
+    model = EstudianteUser
+
+    list_display = ('email', 'is_staff', 'is_active')
+    list_filter = ('is_staff', 'is_active')
+
+    fieldsets = (
+        (None, {'fields': ('email', 'password', 'usuario')}),
+        ('Permisos', {'fields': ('is_staff', 'is_active', 'is_superuser')}),
     )
+
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('email', 'usuario', 'password1', 'password2'),
+        }),
+    )
+
     search_fields = ('email',)
-    list_filter = ('is_staff',)
-    autocomplete_fields = ['usuario']
+    ordering = ('email',)
+
+admin.site.register(EstudianteUser, EstudianteAdmin)
