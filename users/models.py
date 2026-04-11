@@ -59,8 +59,8 @@ class EstudianteUser(AbstractBaseUser, PermissionsMixin):
     usuario = models.OneToOneField(
         UserSimple, on_delete=models.CASCADE, verbose_name="Usuario", db_column='user', unique=True, null=False
     )
-    email = models.EmailField(verbose_name="Email", db_column='email', unique=True)
-    
+    email = models.CharField(verbose_name="Usuario", db_column='email', unique=True, max_length=50)
+
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
 
