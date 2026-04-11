@@ -37,6 +37,8 @@ urlpatterns = [
     # List
     
     path('respuestas-examen-programa/<str:estudiante_email>/<int:programa_id>/<int:examen_id>/', RespuestaExamensProgramaListAPIView.as_view(), name='respuestas-examen-programa'),
+    path('respuestas-examen-programa-curso/<str:estudiante_email>/<int:examen_id>/', RespuestaExamensProgramaCursoListAPIView.as_view(), name='respuestas-examen-programa-curso'),
+
     path('programas-matriculados/<str:estudiante_email>/', ProgramasMatriculadosPorEstudianteListAPIView.as_view(), name='programas-matriculados-list'),
     path('cursos-matriculados/<str:estudiante_email>/', CursosMatriculadosPorEstudianteListAPIView.as_view(), name='cursos_matriculados-list'),
     path('registros-examen-programa/<int:programa_id>/<int:estudiante_id>', RegistroExamenProgramaPorMatriculaListView.as_view(), name='registros-examen-programa-por-matricula-list'),

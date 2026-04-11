@@ -29,6 +29,21 @@ class RespuestaExamensProgramaListAPIView(ListAPIView):
             )
 
 
+class RespuestaExamensProgramaCursoListAPIView(ListAPIView):
+    serializer_class = RespuestaExamenCursoSerializer
+
+    def get_queryset(self):
+            estudiante_email = self.kwargs.get('estudiante_email')
+            examen_id = self.kwargs.get('examen_id')
+            if not estudiante_email:
+                return RespuestaExamenCurso.objects.none()
+            # Filtrar programas directamente mediante la relación en MatriculaPrograma
+            return RespuestaExamenCurso.objects.filter(
+                rescurestcod__email=estudiante_email,
+                rescurexacod__exacurcod=examen_id
+            )
+
+
 # Devuelve todos los programas matriculados de X estudiante
 class ProgramasMatriculadosPorEstudianteListAPIView(ListAPIView):
     serializer_class = ProgramaSerializer

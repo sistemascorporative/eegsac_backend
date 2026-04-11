@@ -689,6 +689,11 @@ class GuardarRespuestasExamenCursoAPIView(APIView):
             return Response({"detail": "El examen no existe."}, status=status.HTTP_404_NOT_FOUND)
 
         try:
+            curso = Curso.objects.get(pk=examen_id)
+        except Curso.DoesNotExist:
+            return Response({"detail": "El curso no existe."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
             estudiante = EstudianteUser.objects.get(pk=estudiante_id)
         except EstudianteUser.DoesNotExist:
             return Response({"detail": "El estudiante no existe."}, status=status.HTTP_404_NOT_FOUND)
@@ -738,11 +743,19 @@ class GuardarRespuestasExamenCursoAPIView(APIView):
                     rescuraltcod=alternativa,
                 )
                 nueva_respuesta.save()
-        
+
+        estado_pendiente = EstadoExamen.objects.get(estexanom="Reprobado")  # o Pendiente
+
         # Obtener el registro del examen para el estudiante y el curso
         registro_examen, created = RegistroExamenCurso.objects.get_or_create(
             regexacurestcod=estudiante,
             regexacurexacod=examen,
+            regexacurcurcod=curso,
+            defaults={
+                "regexacurestexacod": estado_pendiente,
+                "regexacurpun": 0.0,
+                "regexacurint": 0
+            }
         )
         
         # Actualizar la puntuación total y el número de intentos
