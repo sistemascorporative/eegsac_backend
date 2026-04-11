@@ -595,7 +595,7 @@ class GuardarRespuestasExamenProgramaAPIView(APIView):
         total_preguntas = Pregunta.objects.filter(preexacod=examen).count()
         
         # Calcular la puntuación por cada respuesta correcta
-        puntuacion_por_respuesta_correcta = 100.00 / total_preguntas if total_preguntas > 0 else 0.0
+        puntuacion_por_respuesta_correcta = 20.00 / total_preguntas if total_preguntas > 0 else 0.0
         
         puntuacion_total = 0.0
         
@@ -653,7 +653,7 @@ class GuardarRespuestasExamenProgramaAPIView(APIView):
         # Actualizar el estado del examen según la puntuación obtenida
         estado_aprobado = EstadoExamen.objects.get(estexanom="Aprobado")
         estado_desaprobado = EstadoExamen.objects.get(estexanom="Reprobado")
-        if puntuacion_total >= 85.0:
+        if puntuacion_total >= 14:
             registro_examen.regexaproestexacod = estado_aprobado
         else:
             registro_examen.regexaproestexacod = estado_desaprobado
@@ -675,7 +675,6 @@ class GuardarRespuestasExamenCursoAPIView(APIView):
     def post(self, request, *args, **kwargs):
         respuestas_data = request.data.get('respuestas', [])  # Lista de respuestas
         examen_id = request.data.get('examenId')
-        programa_id = request.data.get('programaId')
         estudiante_id = request.user.id  # Asumimos que el usuario está autenticado
         
         # Validación de datos recibidos
@@ -683,18 +682,11 @@ class GuardarRespuestasExamenCursoAPIView(APIView):
             return Response({"detail": "No se han proporcionado respuestas."}, status=status.HTTP_400_BAD_REQUEST)
         if not examen_id:
             return Response({"detail": "El ID del examen es requerido."}, status=status.HTTP_400_BAD_REQUEST)
-        if not programa_id:
-            return Response({"detail": "El ID del programa es requerido."}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
             examen = Examen.objects.get(pk=examen_id)
         except Examen.DoesNotExist:
             return Response({"detail": "El examen no existe."}, status=status.HTTP_404_NOT_FOUND)
-
-        try:
-            programa = Programa.objects.get(pk=programa_id)
-        except Programa.DoesNotExist:
-            return Response({"detail": "El programa no existe."}, status=status.HTTP_404_NOT_FOUND)
 
         try:
             estudiante = EstudianteUser.objects.get(pk=estudiante_id)
@@ -705,7 +697,7 @@ class GuardarRespuestasExamenCursoAPIView(APIView):
         total_preguntas = Pregunta.objects.filter(preexacod=examen).count()
         
         # Calcular la puntuación por cada respuesta correcta
-        puntuacion_por_respuesta_correcta = 100.00 / total_preguntas if total_preguntas > 0 else 0.0
+        puntuacion_por_respuesta_correcta = 20.00 / total_preguntas if total_preguntas > 0 else 0.0
         
         puntuacion_total = 0.0
         
@@ -760,19 +752,11 @@ class GuardarRespuestasExamenCursoAPIView(APIView):
         # Actualizar el estado del examen según la puntuación obtenida
         estado_aprobado = EstadoExamen.objects.get(estexanom="Aprobado")
         estado_desaprobado = EstadoExamen.objects.get(estexanom="Reprobado")
-        if puntuacion_total >= 85.0:
+        if puntuacion_total >= 14:
             registro_examen.regexacurestexacod = estado_aprobado
         else:
             registro_examen.regexacurestexacod = estado_desaprobado
 
         registro_examen.save()
-        
-        # Calcular el promedio de todas las puntuaciones de exámenes del estudiante en el programa
-        registros_examen = RegistroExamenCurso.objects.filter(
-            regexacurestcod=estudiante,
-            regexacurcurcod=programa
-        )
-        promedio_puntuacion = registros_examen.aggregate(promedio=Avg('regexapun'))['promedio']
-        
         
         return Response({"message": "Respuestas guardadas o actualizadas con éxito."}, status=status.HTTP_200_OK)

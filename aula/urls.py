@@ -19,6 +19,7 @@ urlpatterns = [
     path('programa/<int:programa_id>/estudiante/<str:estudiante_id>/registrosexamenes/', RegistrosExamenesPorProgramaPorEstudianteListAPIView.as_view(), name='registros-de-examenes-por-programa-y-estudiante'),
     path('programa/<int:programa_id>/examenes/', ExamenesPorProgramaListAPIView.as_view(), name='examenes-por-programa'),
     path('guardar-respuestas-examen/', GuardarRespuestasExamenProgramaAPIView.as_view(), name='guardar_respuestas_examen'),
+    path('guardar-respuestas-examen-curso/', GuardarRespuestasExamenCursoAPIView.as_view(), name='guardar_respuestas_examen_curso'),
     
     path('generar-examen/', GenerarExamenView.as_view(), name='generar_examen'),
     path("modulo/<int:pk>/update-txt/", UpdateModuloTxtContentView.as_view(), name="update-txt"),
