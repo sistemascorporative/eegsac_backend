@@ -671,105 +671,162 @@ class GuardarRespuestasExamenProgramaAPIView(APIView):
 
 
 class GuardarRespuestasExamenCursoAPIView(APIView):
-    
     def post(self, request, *args, **kwargs):
-        respuestas_data = request.data.get('respuestas', [])  # Lista de respuestas
-        examen_id = request.data.get('examenId')
-        estudiante_id = request.user.id  # Asumimos que el usuario está autenticado
-        
-        # Validación de datos recibidos
-        if not respuestas_data:
-            return Response({"detail": "No se han proporcionado respuestas."}, status=status.HTTP_400_BAD_REQUEST)
+        respuestas_data = request.data.get("respuestas")
+        examen_id = request.data.get("examenId")
+
+        if not request.user.is_authenticated:
+            return Response(
+                {"detail": "Se requiere iniciar sesión para enviar el examen."},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        if not isinstance(respuestas_data, dict) or not respuestas_data:
+            return Response(
+                {"detail": "No se han proporcionado respuestas válidas."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         if not examen_id:
-            return Response({"detail": "El ID del examen es requerido."}, status=status.HTTP_400_BAD_REQUEST)
-        
+            return Response(
+                {"detail": "El ID del examen es requerido."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         try:
             examen = Examen.objects.get(pk=examen_id)
         except Examen.DoesNotExist:
-            return Response({"detail": "El examen no existe."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "El examen no existe."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        curso = examen.exacurcod
 
         try:
-            curso = Curso.objects.get(pk=examen_id)
-        except Curso.DoesNotExist:
-            return Response({"detail": "El curso no existe."}, status=status.HTTP_404_NOT_FOUND)
-
-        try:
-            estudiante = EstudianteUser.objects.get(pk=estudiante_id)
+            estudiante = EstudianteUser.objects.get(pk=request.user.pk)
         except EstudianteUser.DoesNotExist:
-            return Response({"detail": "El estudiante no existe."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "El estudiante no existe."},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
-        # Obtener el número total de preguntas en el examen
+        try:
+            respuestas = {
+                int(pregunta_id): int(alternativa_id)
+                for pregunta_id, alternativa_id in respuestas_data.items()
+            }
+        except (TypeError, ValueError):
+            return Response(
+                {"detail": "Los IDs de preguntas y alternativas deben ser numéricos."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if len(respuestas) != len(respuestas_data):
+            return Response(
+                {"detail": "La solicitud contiene IDs de preguntas duplicados o inválidos."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         total_preguntas = Pregunta.objects.filter(preexacod=examen).count()
-        
-        # Calcular la puntuación por cada respuesta correcta
-        puntuacion_por_respuesta_correcta = 20.00 / total_preguntas if total_preguntas > 0 else 0.0
-        
-        puntuacion_total = 0.0
-        
-        for pregunta_id, alternativa_id in respuestas_data.items():
-            try:
-                pregunta = Pregunta.objects.get(pk=pregunta_id)
-            except Pregunta.DoesNotExist:
-                return Response({"detail": f"La pregunta con ID {pregunta_id} no existe."}, status=status.HTTP_404_NOT_FOUND)
+        if total_preguntas == 0:
+            return Response(
+                {"detail": "El examen no contiene preguntas."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-            try:
-                alternativa = Alternativa.objects.get(pk=alternativa_id)
-            except Alternativa.DoesNotExist:
-                return Response({"detail": f"La alternativa con ID {alternativa_id} no existe."}, status=status.HTTP_404_NOT_FOUND)
-            
-            # Calcular la puntuación según la lógica del negocio
-            puntuacion = puntuacion_por_respuesta_correcta if alternativa.altcor else 0.0
-            puntuacion_total += puntuacion
-            
-            # Verificar si ya existe un registro de respuesta para esta pregunta
-            respuesta_existente = RespuestaExamenCurso.objects.filter(
-                rescurestcod=estudiante,
-                rescurexacod=examen,
-                rescurprecod=pregunta,
-            ).first()
+        preguntas = {
+            pregunta.precod: pregunta
+            for pregunta in Pregunta.objects.filter(
+                preexacod=examen,
+                precod__in=respuestas.keys()
+            )
+        }
+        if len(preguntas) != len(respuestas):
+            return Response(
+                {"detail": "Una o más preguntas no pertenecen a este examen."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-            if respuesta_existente:
-                # Actualizar la respuesta existente
-                respuesta_existente.rescuraltcod = alternativa
-                respuesta_existente.rescurpun = puntuacion
-                respuesta_existente.save()
-            else:
-                # Crear una nueva respuesta si no existe
-                nueva_respuesta = RespuestaExamenCurso(
-                    rescurpun=puntuacion,
+        alternativas = {
+            (alternativa.altprecod_id, alternativa.altcod): alternativa
+            for alternativa in Alternativa.objects.filter(
+                altprecod_id__in=respuestas.keys(),
+                altcod__in=respuestas.values()
+            )
+        }
+        for pregunta_id, alternativa_id in respuestas.items():
+            if (pregunta_id, alternativa_id) not in alternativas:
+                return Response(
+                    {"detail": "Una o más alternativas no corresponden a su pregunta."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        try:
+            estado_aprobado = EstadoExamen.objects.get(estexanom="Aprobado")
+            estado_desaprobado = EstadoExamen.objects.get(estexanom="Reprobado")
+        except EstadoExamen.DoesNotExist:
+            return Response(
+                {"detail": "No están configurados los estados del examen."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        from decimal import Decimal
+
+        puntos_por_respuesta = Decimal("20.00") / Decimal(total_preguntas)
+        respuestas_calificadas = {
+            pregunta_id: (
+                alternativas[(pregunta_id, alternativa_id)],
+                puntos_por_respuesta
+                if alternativas[(pregunta_id, alternativa_id)].altcor
+                else Decimal("0.00")
+            )
+            for pregunta_id, alternativa_id in respuestas.items()
+        }
+        puntuacion_total = sum(
+            (puntos for _, puntos in respuestas_calificadas.values()),
+            Decimal("0.00")
+        ).quantize(Decimal("0.01"))
+
+        with transaction.atomic():
+            for pregunta_id, (alternativa, puntuacion) in respuestas_calificadas.items():
+                respuesta_existente = RespuestaExamenCurso.objects.filter(
                     rescurestcod=estudiante,
                     rescurexacod=examen,
-                    rescurprecod=pregunta,
-                    rescuraltcod=alternativa,
-                )
-                nueva_respuesta.save()
+                    rescurprecod=preguntas[pregunta_id],
+                ).first()
 
-        estado_pendiente = EstadoExamen.objects.get(estexanom="Reprobado")  # o Pendiente
+                if respuesta_existente:
+                    respuesta_existente.rescuraltcod = alternativa
+                    respuesta_existente.rescurpun = puntuacion
+                    respuesta_existente.save()
+                else:
+                    RespuestaExamenCurso.objects.create(
+                        rescurpun=puntuacion,
+                        rescurestcod=estudiante,
+                        rescurexacod=examen,
+                        rescurprecod=preguntas[pregunta_id],
+                        rescuraltcod=alternativa,
+                    )
 
-        # Obtener el registro del examen para el estudiante y el curso
-        registro_examen, created = RegistroExamenCurso.objects.get_or_create(
-            regexacurestcod=estudiante,
-            regexacurexacod=examen,
-            regexacurcurcod=curso,
-            defaults={
-                "regexacurestexacod": estado_pendiente,
-                "regexacurpun": 0.0,
-                "regexacurint": 0
-            }
+            registro_examen, _ = RegistroExamenCurso.objects.get_or_create(
+                regexacurestcod=estudiante,
+                regexacurexacod=examen,
+                regexacurcurcod=curso,
+                defaults={
+                    "regexacurestexacod": estado_desaprobado,
+                    "regexacurpun": Decimal("0.00"),
+                    "regexacurint": 0,
+                }
+            )
+            registro_examen.regexacurpun = puntuacion_total
+            registro_examen.regexacurint += 1
+            registro_examen.regexacurestexacod = (
+                estado_aprobado
+                if puntuacion_total >= Decimal("14.00")
+                else estado_desaprobado
+            )
+            registro_examen.save()
+
+        return Response(
+            {"message": "Respuestas guardadas o actualizadas con éxito."},
+            status=status.HTTP_200_OK
         )
-        
-        # Actualizar la puntuación total y el número de intentos
-        registro_examen.regexacurpun = puntuacion_total
-        registro_examen.regexacurint += 1
-        
-        # Actualizar el estado del examen según la puntuación obtenida
-        estado_aprobado = EstadoExamen.objects.get(estexanom="Aprobado")
-        estado_desaprobado = EstadoExamen.objects.get(estexanom="Reprobado")
-        if puntuacion_total >= 14:
-            registro_examen.regexacurestexacod = estado_aprobado
-        else:
-            registro_examen.regexacurestexacod = estado_desaprobado
-
-        registro_examen.save()
-        
-        return Response({"message": "Respuestas guardadas o actualizadas con éxito."}, status=status.HTTP_200_OK)
